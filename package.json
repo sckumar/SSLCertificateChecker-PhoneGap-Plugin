@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EddyVerbruggen/SSLCertificateChecker-PhoneGap-Plugin.git"
+    "url": "git+https://github.com/sckumar/SSLCertificateChecker-PhoneGap-Plugin.git"
   },
   "keywords": [
     "Certificate",
@@ -34,7 +34,7 @@
   "author": "Eddy Verbruggen <eddyverbruggen@gmail.com> (https://github.com/EddyVerbruggen)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/EddyVerbruggen/SSLCertificateChecker-PhoneGap-Plugin/issues"
+    "url": "https://github.com/sckumar/SSLCertificateChecker-PhoneGap-Plugin/issues"
   },
-  "homepage": "https://github.com/EddyVerbruggen/SSLCertificateChecker-PhoneGap-Plugin#readme"
+  "homepage": "https://github.com/sckumar/SSLCertificateChecker-PhoneGap-Plugin#readme"
 }

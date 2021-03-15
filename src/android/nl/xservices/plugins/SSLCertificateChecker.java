@@ -6,13 +6,16 @@ import org.json.JSONArray;
 import org.json.JSONException;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.security.cert.CertificateException;
 import java.io.IOException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.util.LinkedList;
+import java.util.List;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
 
 public class SSLCertificateChecker extends CordovaPlugin {
 
@@ -25,19 +28,52 @@ public class SSLCertificateChecker extends CordovaPlugin {
       cordova.getThreadPool().execute(new Runnable() {
         public void run() {
           try {
-            final String serverURL = args.getString(0);
-            final JSONArray allowedFingerprints = args.getJSONArray(2);
-            final String serverCertFingerprint = getFingerprint(serverURL);
-            for (int j=0; j<allowedFingerprints.length(); j++) {
-              if (allowedFingerprints.get(j).toString().equalsIgnoreCase(serverCertFingerprint)) {
-                callbackContext.success("CONNECTION_SECURE");
-                return;
-              }
+            List<String> fingerprints = new LinkedList<>();
+            String getUrlStr = args.getString(0);
+            JSONArray fingerprintsJson = args.getJSONArray(2);
+            for (int i = 0; i < fingerprintsJson.length(); i++) {
+              fingerprints.add(fingerprintsJson.getString(i));
             }
-            callbackContext.error("CONNECTION_NOT_SECURE");
-          } catch (Exception e) {
-            callbackContext.error("CONNECTION_NOT_SECURE");
-            //callbackContext.error("CONNECTION_FAILED. Details: " + e.getMessage());
+            try {
+              URL getUrl = new URL(getUrlStr);
+              getUrl.getHost();
+              try {
+                HttpsURLConnection conn = (HttpsURLConnection) getUrl.openConnection();
+                try {
+                  conn.setUseCaches(false);
+                  TrustManager[] tm = {new HashTrust(fingerprints)};
+                  SSLContext connContext = SSLContext.getInstance("TLS");
+                  connContext.init(null, tm, null);
+                  conn.setSSLSocketFactory(connContext.getSocketFactory());
+                  conn.setHostnameVerifier(new HostnameVerifier() {
+                    public boolean verify(String connectedHostname, SSLSession sslSession) {
+                      return true;
+                    }
+                  });
+                  try {
+                    conn.setConnectTimeout(5000);
+                    conn.connect();
+                    callbackContext.success("CONNECTION_SECURE");
+                  } catch (SocketTimeoutException e3) {
+                    callbackContext.error("TIMEOUT");
+                  } catch (IOException e4) {
+                    if (e4.getMessage().indexOf("INVALID_CERT") > -1) {
+                      callbackContext.error("CONNECTION_NOT_SECURE");
+                    } else {
+                      callbackContext.error("CANT_CONNECT");
+                    }
+                  }
+                } catch (Exception e5) {
+                  callbackContext.error("CANT_CONNECT");
+                }
+              } catch (IOException e6) {
+                callbackContext.error("CANT_CONNECT");
+              }
+            } catch (MalformedURLException e7) {
+              callbackContext.error("INVALID_URL");
+            }
+          } catch (JSONException e8) {
+            callbackContext.error("INVALID_PARAMS");
           }
         }
       });
@@ -46,28 +82,5 @@ public class SSLCertificateChecker extends CordovaPlugin {
       callbackContext.error("sslCertificateChecker." + action + " is not a supported function. Did you mean '" + ACTION_CHECK_EVENT + "'?");
       return false;
     }
-  }
-
-  private static String getFingerprint(String httpsURL) throws IOException, NoSuchAlgorithmException, CertificateException, CertificateEncodingException {
-    final HttpsURLConnection con = (HttpsURLConnection) new URL(httpsURL).openConnection();
-    con.setConnectTimeout(5000);
-    con.connect();
-    final Certificate cert = con.getServerCertificates()[0];
-    final MessageDigest md = MessageDigest.getInstance("SHA256");
-    md.update(cert.getEncoded());
-    return dumpHex(md.digest());
-  }
-
-  private static String dumpHex(byte[] data) {
-    final int n = data.length;
-    final StringBuilder sb = new StringBuilder(n * 3 - 1);
-    for (int i = 0; i < n; i++) {
-      if (i > 0) {
-        sb.append(' ');
-      }
-      sb.append(HEX_CHARS[(data[i] >> 4) & 0x0F]);
-      sb.append(HEX_CHARS[data[i] & 0x0F]);
-    }
-    return sb.toString();
   }
 }
